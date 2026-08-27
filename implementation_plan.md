@@ -1,10 +1,8 @@
-# 📋 Smart Doc Assistant — Production-Grade Implementation Plan
-
-> **Mục đích**: Đây là cách một **Software Engineer chuyên nghiệp** lên kế hoạch cho 1 dự án thực tế. Mỗi phần mình sẽ giải thích **tại sao** họ làm như vậy.
+# Smart Doc Assistant — Production-Grade Implementation Plan
 
 ---
 
-## 📖 Mục lục
+## Mục lục
 
 1. [Phase 0 — Requirements Gathering](#phase-0--requirements-gathering-thu-thập-yêu-cầu)
 2. [Phase 1 — System Design](#phase-1--system-design-thiết-kế-hệ-thống)
@@ -17,12 +15,9 @@
 
 ---
 
-# Phase 0 — Requirements Gathering (Thu thập yêu cầu)
+# Phase 0 — Requirements Gathering 
 
-> [!TIP]
-> **Tại sao phải làm bước này?** SWE giỏi KHÔNG BAO GIỜ nhảy vào code ngay. Họ dành 20-30% thời gian để hiểu rõ bài toán. Code sai requirement thì vứt đi viết lại — tốn gấp 5 lần thời gian.
-
-## 1.1 Tổng quan sản phẩm (Product Overview)
+## 1.1 Product Overview
 
 | Mục | Mô tả |
 |-----|-------|
@@ -31,12 +26,9 @@
 | **Target User** | Cá nhân muốn quản lý & truy vấn kiến thức từ tài liệu |
 | **Problem Solved** | Đọc nhiều tài liệu nhưng không nhớ hết, tìm kiếm thông tin mất thời gian |
 
-## 1.2 User Stories (Câu chuyện người dùng)
+## 1.2 User Stories 
 
-> [!NOTE]
-> **User Story** là cách SWE mô tả tính năng từ góc nhìn người dùng. Format: **"As a [ai], I want to [gì], so that [tại sao]"**. Mỗi story phải đủ nhỏ để code trong 1-3 ngày.
-
-### 🟢 MVP (Minimum Viable Product) — Làm trước
+### MVP (Minimum Viable Product) 
 | ID | User Story | Priority |
 |----|-----------|----------|
 | US-01 | Là user, tôi muốn **upload file PDF/TXT** lên hệ thống để lưu trữ tài liệu | P0 (Must) |
@@ -44,7 +36,7 @@
 | US-03 | Là user, tôi muốn **chat với AI** và AI trả lời dựa trên nội dung tài liệu tôi đã upload | P0 (Must) |
 | US-04 | Là user, tôi muốn **xóa tài liệu** không cần nữa | P0 (Must) |
 
-### 🟡 Enhancement — Làm sau MVP
+### Enhancement 
 | ID | User Story | Priority |
 |----|-----------|----------|
 | US-05 | Là user, tôi muốn **upload file Word, Markdown** | P1 (Should) |
@@ -52,17 +44,15 @@
 | US-07 | Là user, tôi muốn **xem lịch sử chat** để tìm lại câu trả lời cũ | P1 (Should) |
 | US-08 | Là user, tôi muốn **tạo nhiều conversation** riêng biệt | P1 (Should) |
 
-### 🔵 Nice-to-have — Làm khi có thời gian
+### Nice-to-have 
 | ID | User Story | Priority |
 |----|-----------|----------|
 | US-09 | Là user, tôi muốn **đăng nhập/đăng ký** để bảo mật dữ liệu | P2 (Could) |
 | US-10 | Là user, tôi muốn **tóm tắt tài liệu** tự động khi upload | P2 (Could) |
 | US-11 | Là user, tôi muốn AI hỗ trợ **multi-modal** (hình ảnh trong PDF) | P3 (Won't now) |
 
-## 1.3 Functional Requirements (Yêu cầu chức năng)
+## 1.3 Functional Requirements 
 
-> [!NOTE]
-> **Functional Requirements** = hệ thống phải LÀM ĐƯỢC gì. Đây là checklist để verify khi code xong.
 
 | # | Requirement | Liên quan User Story |
 |---|------------|---------------------|
@@ -74,10 +64,7 @@
 | FR-06 | Hệ thống phải **stream response** (hiển thị từng chữ, không đợi hết) | US-03 |
 | FR-07 | Khi xóa tài liệu, hệ thống phải **xóa cả embeddings** trong vector store | US-04 |
 
-## 1.4 Non-Functional Requirements (Yêu cầu phi chức năng)
-
-> [!NOTE]
-> **Non-Functional Requirements** = hệ thống phải hoạt động TỐT THẾ NÀO. Ví dụ: nhanh bao nhiêu, chịu được bao nhiêu user...
+## 1.4 Non-Functional Requirements 
 
 | # | Requirement | Target |
 |---|------------|--------|
@@ -89,22 +76,20 @@
 
 ---
 
-# Phase 1 — System Design (Thiết kế hệ thống)
+# Phase 1 — System Design 
 
-> [!TIP]
-> **Tại sao phải design trước?** Giống như xây nhà phải có bản vẽ. Nếu không design, bạn sẽ code rối, các component phụ thuộc lẫn nhau (tight coupling), sau này sửa 1 chỗ thì vỡ 10 chỗ khác.
 
-## 1.1 Kiến trúc tổng quan (Architecture Overview)
+## 1.1 Architecture Overview
 
 ```mermaid
 graph TB
-    subgraph Client["🖥️ Frontend — React + Vite"]
+    subgraph Client["Frontend — React + Vite"]
         ChatUI["Chat Interface"]
         UploadUI["Document Upload"]
         DocList["Document Manager"]
     end
 
-    subgraph Gateway["☕ Backend API — Java Spring Boot"]
+    subgraph Gateway["Backend API — Java Spring Boot"]
         Controller["REST Controllers"]
         Service["Service Layer"]
         FileService["File Service"]
@@ -115,7 +100,7 @@ graph TB
         FileStore["Local File Storage"]
     end
 
-    subgraph AIService["🐍 AI Service — Python FastAPI"]
+    subgraph AIService["AI Service — Python FastAPI"]
         Ingest["Document Ingestion"]
         Chunker["Text Chunker"]
         Embedder["Embedding Generator"]
@@ -166,8 +151,6 @@ graph TB
 
 ## 1.2 Data Flow — Upload Document
 
-> [!NOTE]
-> **Sequence Diagram** cho thấy các service giao tiếp với nhau **theo thứ tự thời gian** như thế nào. SWE dùng diagram này để đảm bảo không thiếu bước nào.
 
 ```mermaid
 sequenceDiagram
@@ -201,7 +184,7 @@ sequenceDiagram
     Note over FE: Polling hoặc WebSocket
     FE->>BE: GET /api/documents/{id}
     BE-->>FE: {status: 'READY', chunks: 42}
-    FE-->>User: ✅ "Tài liệu đã sẵn sàng!"
+    FE-->>User: "Tài liệu đã sẵn sàng!"
 ```
 
 ## 1.3 Data Flow — Chat with AI
@@ -245,7 +228,7 @@ sequenceDiagram
     BE->>DB: INSERT chat_message (role='assistant', full_text)
 ```
 
-## 1.4 Tech Stack Chi Tiết
+## 1.4 Tech Stack
 
 ### Backend API — Java
 
@@ -284,10 +267,7 @@ sequenceDiagram
 
 ---
 
-# Phase 2 — Database Design (Thiết kế cơ sở dữ liệu)
-
-> [!TIP]
-> **Tại sao phải design DB trước khi code?** Database là "xương sống" của app. Sai ở đây thì phải migration rất đau đớn. SWE giỏi dành thời gian nghĩ kỹ schema trước.
+# Phase 2 — Database Design 
 
 ## 2.1 Entity Relationship Diagram (ERD)
 
@@ -354,10 +334,8 @@ erDiagram
 
 ---
 
-# Phase 3 — API Design (Thiết kế API)
+# Phase 3 — API Design 
 
-> [!TIP]
-> **Tại sao phải design API trước?** Vì API là "hợp đồng" giữa Frontend và Backend. Nếu 2 team cùng làm, họ thống nhất API trước rồi mỗi bên code độc lập. Khi ghép lại mọi thứ "khớp" ngay.
 
 ## 3.1 RESTful API Conventions
 
@@ -380,9 +358,9 @@ Status Codes:
   500 Server Error → Lỗi server
 ```
 
-## 3.2 API Endpoints Chi Tiết
+## 3.2 API Endpoints 
 
-### 📄 Documents API
+### Documents API
 
 #### `POST /api/v1/documents` — Upload tài liệu
 
@@ -465,7 +443,7 @@ Side effects:
 
 ---
 
-### 💬 Chat API
+### Chat API
 
 #### `POST /api/v1/conversations` — Tạo conversation mới
 
@@ -528,10 +506,8 @@ Response: 200 OK
 
 ---
 
-### 🐍 Internal AI Service API (Backend → AI Service)
+### Internal AI Service API (Backend → AI Service)
 
-> [!NOTE]
-> Đây là API **nội bộ** giữa Java Backend và Python AI Service. User không gọi trực tiếp.
 
 #### `POST /ingest` — Xử lý tài liệu
 
@@ -578,14 +554,9 @@ Response: 200 OK
 
 ---
 
-# Phase 4 — Development Sprints (Lộ trình phát triển)
+# Phase 4 — Development Sprints 
 
-> [!TIP]
-> **Sprint** là cách chia công việc thành các đợt 1-2 tuần. Mỗi sprint kết thúc bạn phải có **deliverable chạy được** — không phải code dở dang. Điều này giúp bạn thấy tiến bộ liên tục và không bị overwhelmed.
-
-## Sprint 0: Environment Setup (2-3 ngày) 🔧
-
-> **Goal**: Mọi tool đều chạy được, sẵn sàng code
+## Sprint 0: Environment Setup
 
 - [ ] Cài đặt **JDK 21** (recommend: SDKMAN hoặc Homebrew)
 - [ ] Cài đặt **Gradle 8.x**
@@ -628,9 +599,8 @@ volumes:
 
 ---
 
-## Sprint 1: Java Backend Foundation (1 tuần) ☕
+## Sprint 1: Java Backend Foundation 
 
-> **Goal**: REST API cơ bản chạy được, kết nối DB, upload file
 
 ### Tasks:
 
@@ -665,9 +635,8 @@ volumes:
 
 ---
 
-## Sprint 2: Python AI Service (1 tuần) 🐍
+## Sprint 2: Python AI Service 
 
-> **Goal**: AI Service nhận document → chunk → embed → lưu Qdrant. Chat query trả kết quả.
 
 ### Tasks:
 
@@ -709,9 +678,8 @@ volumes:
 
 ---
 
-## Sprint 3: Integration — Kết nối Java ↔ Python (3-5 ngày) 🔗
+## Sprint 3: Integration — Kết nối Java ↔ Python 
 
-> **Goal**: Java Backend gọi Python AI Service thành công. Full flow hoạt động end-to-end.
 
 ### Tasks:
 
@@ -732,9 +700,8 @@ volumes:
 
 ---
 
-## Sprint 4: Frontend (1-2 tuần) 🎨
+## Sprint 4: Frontend 
 
-> **Goal**: Giao diện web đẹp, functional
 
 ### Tasks:
 
@@ -758,9 +725,7 @@ volumes:
 
 ---
 
-## Sprint 5: Polish & Advanced Features (1 tuần) ✨
-
-> **Goal**: App đáng dùng hàng ngày
+## Sprint 5: Polish & Advanced Features 
 
 ### Tasks:
 
@@ -779,10 +744,8 @@ volumes:
 
 ---
 
-# Phase 5 — Testing Strategy (Chiến lược kiểm thử)
+# Phase 5 — Testing Strategy 
 
-> [!TIP]
-> **Testing Pyramid**: SWE giỏi viết test NHIỀU NHẤT ở tầng Unit (nhanh, rẻ), ÍT HƠN ở Integration (chậm hơn), và CHIA NHỎ nhất ở E2E (chậm nhất). Đừng bỏ qua testing — nó cứu bạn khỏi bugs regression.
 
 ```mermaid
 graph TB
@@ -854,7 +817,7 @@ cd frontend && npm run dev
 
 ```
 smart-doc-assistant/
-├── backend-api/                    # ☕ Java Spring Boot
+├── backend-api/                    # Java Spring Boot
 │   ├── src/
 │   │   ├── main/
 │   │   │   ├── java/com/smartdoc/
@@ -903,7 +866,7 @@ smart-doc-assistant/
 │   ├── build.gradle.kts
 │   └── settings.gradle.kts
 │
-├── ai-service/                     # 🐍 Python FastAPI
+├── ai-service/                     # Python FastAPI
 │   ├── src/
 │   │   ├── main.py
 │   │   ├── config.py
@@ -924,7 +887,7 @@ smart-doc-assistant/
 │   ├── requirements.txt
 │   └── Dockerfile
 │
-├── frontend/                       # 🎨 React + Vite
+├── frontend/                       # React + Vite
 │   ├── src/
 │   │   ├── App.jsx
 │   │   ├── main.jsx
@@ -960,10 +923,8 @@ smart-doc-assistant/
 
 ---
 
-# Glossary — Giải thích thuật ngữ
+# Glossary 
 
-> [!NOTE]
-> Nếu bạn mới bắt đầu, đây là những thuật ngữ quan trọng cần hiểu:
 
 | Thuật ngữ | Giải thích | Ví dụ |
 |-----------|-----------|-------|
@@ -982,7 +943,3 @@ smart-doc-assistant/
 | **JPA/Hibernate** | Java ORM — map Java class sang DB table tự động | `@Entity class Document` → tạo table `documents` |
 | **Docker Compose** | Tool chạy nhiều containers cùng lúc bằng 1 file config | 1 lệnh `docker compose up` → PostgreSQL + Qdrant chạy |
 
----
-
-> [!IMPORTANT]
-> **Bước tiếp theo**: Khi bạn sẵn sàng, mình sẽ bắt đầu từ **Sprint 0** (setup environment) rồi đi từng sprint. Bạn review plan này và cho mình biết muốn điều chỉnh gì nhé!
