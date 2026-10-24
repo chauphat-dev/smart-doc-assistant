@@ -1,11 +1,13 @@
 spring:
+  config:
+    import: "optional:file:.env[.properties]"
   application:
     name: backend-api
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/smartdoc
-    username: smartdoc
-    password: smartdoc_dev
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/smartdoc}
+    username: ${DB_USERNAME:smartdoc}
+    password: ${DB_PASSWORD:smartdoc_dev}
     driver-class-name: org.postgresql.Driver
 
   jpa:
