@@ -32,7 +32,7 @@ public class ChatMessage {
     private String source;
 
     @CreationTimestamp
-    private LocalDateTime createTime;
+    private LocalDateTime createdAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conversation_id",nullable = false)

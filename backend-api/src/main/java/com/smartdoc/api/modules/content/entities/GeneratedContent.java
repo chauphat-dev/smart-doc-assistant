@@ -32,7 +32,7 @@ public class GeneratedContent {
     private String contentData;
 
     @CreationTimestamp
-    private LocalDateTime createTime;
+    private LocalDateTime createdAt;
 
 
     @ManyToOne(fetch = FetchType.LAZY)

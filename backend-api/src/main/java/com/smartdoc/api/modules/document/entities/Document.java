@@ -36,6 +36,8 @@ public class Document {
     @Enumerated(EnumType.STRING)
     private DocumentType docType;
 
+    private String contentType;
+
     private Long fileSize;
 
     @Column(nullable = false)
@@ -44,15 +46,18 @@ public class Document {
 
     private int chunkCount;
 
+
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
+    private String sourceUrl;
+
     @CreationTimestamp
     @Column(nullable = false)
-    private LocalDateTime createAt;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    private LocalDateTime updateAt;
+    private LocalDateTime updatedAt;
 
     @Builder.Default
     @OneToMany(
@@ -69,6 +74,7 @@ public class Document {
     private Set<Conversation> conversations=new HashSet<>();
 
 
+    
     @Builder.Default
     @OneToMany(mappedBy = "document")
     @ToString.Exclude

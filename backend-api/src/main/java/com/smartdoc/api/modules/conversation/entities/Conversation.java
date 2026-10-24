@@ -26,10 +26,10 @@ public class Conversation {
     private String title;
 
     @CreationTimestamp
-    private LocalDateTime createAt;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    private LocalDateTime updateAt;
+    private LocalDateTime updatedAt;
 
     @Builder.Default
     @ManyToMany

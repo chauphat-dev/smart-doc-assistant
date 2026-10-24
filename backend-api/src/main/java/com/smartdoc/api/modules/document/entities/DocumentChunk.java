@@ -27,7 +27,7 @@ public class DocumentChunk {
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createAt;
+    private LocalDateTime createdAt;
 
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
