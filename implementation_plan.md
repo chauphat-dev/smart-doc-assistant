@@ -1,945 +1,397 @@
-# Smart Doc Assistant — Production-Grade Implementation Plan
+# 📋 Smart Doc Assistant — Pragmatic Implementation Plan (v2.2)
+
+> **Triết lý phát triển**: **"Make it work first, make it robust later"**  
+> 1. **Giai đoạn 1 (M0 → M4)**: Tập trung làm luồng chạy bình thường (Happy Path) đơn giản, dễ hiểu, ra sản phẩm chạy được nhanh nhất.  
+> 2. **Giai đoạn 2 (M5 → M6)**: Bổ sung tính năng nâng cao và nâng cấp lên chuẩn Production-Ready (Timeout, Retry, Circuit Breaker, Idempotency).
 
 ---
 
-## Mục lục
+## 📖 Mục lục
 
-1. [Phase 0 — Requirements Gathering](#phase-0--requirements-gathering-thu-thập-yêu-cầu)
-2. [Phase 1 — System Design](#phase-1--system-design-thiết-kế-hệ-thống)
-3. [Phase 2 — Database Design](#phase-2--database-design-thiết-kế-cơ-sở-dữ-liệu)
-4. [Phase 3 — API Design](#phase-3--api-design-thiết-kế-api)
-5. [Phase 4 — Development Sprints](#phase-4--development-sprints-lộ-trình-phát-triển)
-6. [Phase 5 — Testing Strategy](#phase-5--testing-strategy-chiến-lược-kiểm-thử)
-7. [Phase 6 — DevOps & Deployment](#phase-6--devops--deployment)
-8. [Glossary — Giải thích thuật ngữ](#glossary--giải-thích-thuật-ngữ)
-
----
-
-# Phase 0 — Requirements Gathering 
-
-## 1.1 Product Overview
-
-| Mục | Mô tả |
-|-----|-------|
-| **Tên sản phẩm** | Smart Doc Assistant |
-| **Mô tả 1 dòng** | Trợ lý cá nhân AI giúp upload tài liệu, lưu trữ kiến thức, và trả lời câu hỏi dựa trên tài liệu đã upload |
-| **Target User** | Cá nhân muốn quản lý & truy vấn kiến thức từ tài liệu |
-| **Problem Solved** | Đọc nhiều tài liệu nhưng không nhớ hết, tìm kiếm thông tin mất thời gian |
-
-## 1.2 User Stories 
-
-### MVP (Minimum Viable Product) 
-| ID | User Story | Priority |
-|----|-----------|----------|
-| US-01 | Là user, tôi muốn **upload file PDF/TXT** lên hệ thống để lưu trữ tài liệu | P0 (Must) |
-| US-02 | Là user, tôi muốn **xem danh sách tài liệu** đã upload để quản lý | P0 (Must) |
-| US-03 | Là user, tôi muốn **chat với AI** và AI trả lời dựa trên nội dung tài liệu tôi đã upload | P0 (Must) |
-| US-04 | Là user, tôi muốn **xóa tài liệu** không cần nữa | P0 (Must) |
-
-### Enhancement 
-| ID | User Story | Priority |
-|----|-----------|----------|
-| US-05 | Là user, tôi muốn **upload file Word, Markdown** | P1 (Should) |
-| US-06 | Là user, tôi muốn AI **trích dẫn nguồn** (tên file, trang) khi trả lời | P1 (Should) |
-| US-07 | Là user, tôi muốn **xem lịch sử chat** để tìm lại câu trả lời cũ | P1 (Should) |
-| US-08 | Là user, tôi muốn **tạo nhiều conversation** riêng biệt | P1 (Should) |
-
-### Nice-to-have 
-| ID | User Story | Priority |
-|----|-----------|----------|
-| US-09 | Là user, tôi muốn **đăng nhập/đăng ký** để bảo mật dữ liệu | P2 (Could) |
-| US-10 | Là user, tôi muốn **tóm tắt tài liệu** tự động khi upload | P2 (Could) |
-| US-11 | Là user, tôi muốn AI hỗ trợ **multi-modal** (hình ảnh trong PDF) | P3 (Won't now) |
-
-## 1.3 Functional Requirements 
-
-
-| # | Requirement | Liên quan User Story |
-|---|------------|---------------------|
-| FR-01 | Hệ thống phải nhận file upload tối đa **20MB** | US-01 |
-| FR-02 | Hệ thống phải hỗ trợ định dạng: **PDF, TXT** (MVP), Word, MD (sau) | US-01, US-05 |
-| FR-03 | Hệ thống phải **parse nội dung** file và chia thành chunks | US-01 |
-| FR-04 | Hệ thống phải **tạo embeddings** từ chunks và lưu vào vector store | US-01 |
-| FR-05 | Hệ thống phải trả lời câu hỏi dựa trên **context từ tài liệu** (RAG) | US-03 |
-| FR-06 | Hệ thống phải **stream response** (hiển thị từng chữ, không đợi hết) | US-03 |
-| FR-07 | Khi xóa tài liệu, hệ thống phải **xóa cả embeddings** trong vector store | US-04 |
-
-## 1.4 Non-Functional Requirements 
-
-| # | Requirement | Target |
-|---|------------|--------|
-| NFR-01 | Response time cho chat | < 2 giây cho first token |
-| NFR-02 | File upload time | < 10 giây cho file 5MB |
-| NFR-03 | Concurrent users | 1 user (personal app) |
-| NFR-04 | Uptime | Local — chạy khi cần |
-| NFR-05 | Data persistence | Dữ liệu không mất khi restart |
+1. [Phase 0 — Scope & Requirements (Đơn giản hóa cho MVP)](#phase-0--scope--requirements-đơn-giản-hóa-cho-mvp)
+2. [Phase 1 — System Architecture (Happy Path)](#phase-1--system-architecture-happy-path)
+3. [Phase 2 — Database Design (ERD MVP)](#phase-2--database-design-erd-mvp)
+4. [Phase 3 — API Contracts (Đơn giản hóa)](#phase-3--api-contracts-đơn-giản-hóa)
+5. [Phase 4 — Lộ Trình Triển Khai (M0 → M6)](#phase-4--lộ-trình-triển-khai-m0--m6)
+6. [Phase 5 — Nâng Cấp Production-Ready (Làm ở M6)](#phase-5--nâng-cấp-production-ready-làm-ở-m6)
+7. [Phase 6 — Docker Configuration](#phase-6--docker-configuration)
 
 ---
 
-# Phase 1 — System Design 
+# Phase 0 — Scope & Requirements (Đơn giản hóa cho MVP)
 
+* **Mục tiêu cốt lõi**: Upload được file PDF/TXT → AI lưu vào Qdrant → Chat hỏi đáp có streaming và trích dẫn số trang.
+* **Tạm gác lại ở MVP ban đầu**:
+  * Chưa cần cài đặt cấu hình phức tạp của Resilience4j (Circuit Breaker, Retry policy nâng cao).
+  * Chưa cần xử lý đa luồng phân tán phức tạp hay Watchdog.
+  * Chỉ cần gọi HTTP thông thường giữa Java và Python với timeout cơ bản.
 
-## 1.1 Architecture Overview
+---
+
+# Phase 1 — System Architecture (Happy Path)
 
 ```mermaid
 graph TB
-    subgraph Client["Frontend — React + Vite"]
-        ChatUI["Chat Interface"]
-        UploadUI["Document Upload"]
-        DocList["Document Manager"]
+    subgraph Client["🖥️ Giao diện"]
+        Postman["Swagger UI / Postman (M0-M3)"]
+        WebUI["Web UI Đơn Giản (M4)"]
     end
 
-    subgraph Gateway["Backend API — Java Spring Boot"]
-        Controller["REST Controllers"]
-        Service["Service Layer"]
-        FileService["File Service"]
-        DocService["Document Service"]
-        ChatService["Chat Service"]
-        Repository["Repository Layer"]
-        DB["PostgreSQL"]
-        FileStore["Local File Storage"]
+    subgraph Backend["☕ Backend — Java Spring Boot 4.x (:8080)"]
+        DocController["Document Controller"]
+        ChatController["Chat Controller"]
+        DocService["Document Service (@Async cơ bản)"]
+        ChatService["Chat Service (Chuyển tiếp SSE Stream)"]
+        DocRepo["Document Repository"]
+        Disk["Local Storage (Lưu file)"]
     end
 
-    subgraph AIService["AI Service — Python FastAPI"]
-        Ingest["Document Ingestion"]
-        Chunker["Text Chunker"]
-        Embedder["Embedding Generator"]
-        Agent["LangGraph Agent"]
-        Retriever["Vector Retriever"]
-        Generator["Response Generator"]
-        Qdrant["Qdrant Vector DB"]
-        Gemini["Google Gemini API"]
+    subgraph AIWorker["🐍 AI Service — Python FastAPI (:8000)"]
+        FastAPI["FastAPI App"]
+        IngestEndpoint["POST /ingest"]
+        ChatEndpoint["POST /chat"]
+        PDFParser["Parser PDF (Lưu kèm số trang)"]
+        TextSplitter["Chunker (800 tokens)"]
+        LangGraphPipe["LangGraph RAG Workflow"]
     end
 
-    ChatUI -->|"POST /api/chat"| Controller
-    UploadUI -->|"POST /api/documents"| Controller
-    DocList -->|"GET /api/documents"| Controller
+    subgraph Databases["💾 Cơ sở dữ liệu (Docker)"]
+        PG[("PostgreSQL 18\nMetadata tài liệu & Lịch sử chat")]
+        QdrantDB[("Qdrant v1.19.1\nVector Store & Text Payload")]
+        Gemini["☁️ Google AI Studio\n• gemini-3.8-flash\n• gemini-embedding-001"]
+    end
 
-    Controller --> Service
-    Service --> FileService
-    Service --> DocService
-    Service --> ChatService
-    FileService --> FileStore
-    DocService --> Repository
-    Repository --> DB
+    Postman --> DocController
+    Postman --> ChatController
+    WebUI --> DocController
+    WebUI --> ChatController
 
-    ChatService -->|"REST call"| Agent
-    FileService -->|"REST call"| Ingest
+    DocController --> DocService
+    ChatController --> ChatService
 
-    Ingest --> Chunker
-    Chunker --> Embedder
-    Embedder --> Qdrant
-    Agent --> Retriever
-    Retriever --> Qdrant
-    Agent --> Generator
-    Generator --> Gemini
+    DocService --> Disk
+    DocService --> DocRepo --> PG
+    DocService -->|"HTTP POST /ingest"| IngestEndpoint
 
-    style Client fill:#1a1a2e,stroke:#16213e,color:#e94560
-    style Gateway fill:#0f3460,stroke:#16213e,color:#e94560
-    style AIService fill:#533483,stroke:#16213e,color:#e94560
+    ChatService -->|"HTTP POST /chat (SSE stream)"| ChatEndpoint
+
+    IngestEndpoint --> PDFParser --> TextSplitter --> QdrantDB
+    IngestEndpoint --> Gemini
+
+    ChatEndpoint --> LangGraphPipe
+    LangGraphPipe --> QdrantDB
+    LangGraphPipe --> Gemini
 ```
-
-### Giải thích kiến trúc
-
-| Layer | Vai trò | Tại sao tách riêng? |
-|-------|---------|---------------------|
-| **Frontend** | Giao diện người dùng | Tách riêng để có thể thay đổi UI mà không ảnh hưởng backend |
-| **Backend API (Java)** | Xử lý business logic, quản lý file/doc, routing | Java mạnh về enterprise patterns, bạn học được nhiều design patterns |
-| **AI Service (Python)** | Xử lý AI: embedding, RAG, LangGraph | LangGraph/LangChain chỉ có Python, tách riêng để scale độc lập |
-| **PostgreSQL** | Lưu metadata tài liệu, lịch sử chat | Relational DB phổ biến nhất, free, reliable |
-| **Qdrant** | Lưu vector embeddings | Chuyên biệt cho vector search, nhanh hơn nhiều so với dùng PostgreSQL |
-
-## 1.2 Data Flow — Upload Document
-
-
-```mermaid
-sequenceDiagram
-    actor User
-    participant FE as Frontend
-    participant BE as Java Backend
-    participant DB as PostgreSQL
-    participant FS as File Storage
-    participant AI as Python AI Service
-    participant QD as Qdrant
-
-    User->>FE: Chọn file & click Upload
-    FE->>BE: POST /api/documents (multipart file)
-    
-    Note over BE: Validate file (size, type)
-    BE->>FS: Lưu file vào disk
-    BE->>DB: INSERT document metadata (filename, size, status='PROCESSING')
-    BE-->>FE: 202 Accepted {documentId, status: 'PROCESSING'}
-    
-    Note over BE: Async processing
-    BE->>AI: POST /ingest {documentId, filePath}
-    
-    Note over AI: 1. Đọc file content
-    Note over AI: 2. Chia thành chunks (500-1000 tokens)
-    Note over AI: 3. Tạo embeddings cho mỗi chunk
-    AI->>QD: Upsert vectors với metadata
-    AI-->>BE: 200 OK {chunks_count: 42}
-    
-    BE->>DB: UPDATE document SET status='READY', chunks=42
-    
-    Note over FE: Polling hoặc WebSocket
-    FE->>BE: GET /api/documents/{id}
-    BE-->>FE: {status: 'READY', chunks: 42}
-    FE-->>User: "Tài liệu đã sẵn sàng!"
-```
-
-## 1.3 Data Flow — Chat with AI
-
-```mermaid
-sequenceDiagram
-    actor User
-    participant FE as Frontend
-    participant BE as Java Backend
-    participant DB as PostgreSQL
-    participant AI as Python AI Service
-    participant QD as Qdrant
-    participant LLM as Google Gemini
-
-    User->>FE: Gõ câu hỏi: "Tóm tắt chương 3?"
-    FE->>BE: POST /api/chat {message, conversationId}
-    
-    BE->>DB: INSERT chat_message (role='user')
-    BE->>AI: POST /chat {query, documentIds, history}
-    
-    Note over AI: LangGraph Agent bắt đầu
-    
-    rect rgb(68, 68, 102)
-        Note over AI: Step 1: Retrieve
-        AI->>QD: Vector search (query embedding, top_k=5)
-        QD-->>AI: 5 relevant chunks + scores
-    end
-    
-    rect rgb(68, 102, 68)
-        Note over AI: Step 2: Generate
-        AI->>LLM: Prompt = System + Context chunks + User query
-        LLM-->>AI: Streaming response tokens
-    end
-    
-    Note over AI: Stream tokens back
-    AI-->>BE: SSE stream (token by token)
-    BE-->>FE: SSE stream (token by token)
-    FE-->>User: Hiển thị từng chữ "Chương 3 nói về..."
-    
-    Note over BE: Khi stream kết thúc
-    BE->>DB: INSERT chat_message (role='assistant', full_text)
-```
-
-## 1.4 Tech Stack
-
-### Backend API — Java
-
-| Thành phần | Công nghệ | Version | Tại sao chọn |
-|-----------|-----------|---------|--------------|
-| **Framework** | Spring Boot | 3.3.x | Framework Java phổ biến nhất, auto-configuration, huge ecosystem |
-| **Build Tool** | Gradle (Kotlin DSL) | 8.x | Nhanh hơn Maven, script dễ đọc hơn XML |
-| **Web** | Spring Web MVC | — | REST API, built-in trong Spring Boot |
-| **ORM** | Spring Data JPA + Hibernate | — | Tương tác DB bằng Java objects, không viết SQL thủ công |
-| **Database** | PostgreSQL | 16 | Open-source, mạnh, phổ biến nhất cho production |
-| **Migration** | Flyway | — | Version control cho database schema (giống Git cho DB) |
-| **Validation** | Jakarta Validation | — | Validate input data tự động bằng annotations |
-| **HTTP Client** | Spring WebClient | — | Non-blocking HTTP client gọi AI Service |
-| **Streaming** | Spring WebFlux (SSE) | — | Server-Sent Events cho streaming chat response |
-| **File Upload** | Spring Multipart | — | Built-in file upload handling |
-| **API Docs** | SpringDoc OpenAPI | — | Tự generate API documentation |
-| **Testing** | JUnit 5 + Mockito | — | Standard testing framework cho Java |
-
-### AI Service — Python
-
-| Thành phần | Công nghệ | Tại sao chọn |
-|-----------|-----------|--------------|
-| **Framework** | FastAPI | Nhanh, async, auto-generate docs |
-| **AI Agent** | LangGraph | Multi-step reasoning, state management |
-| **RAG** | LangChain | Document loaders, text splitters, embeddings |
-| **Vector Store** | Qdrant | Self-hosted, hiệu suất cao, Python SDK tốt |
-| **LLM** | Google Gemini 2.0 Flash | Miễn phí, nhanh, tiếng Việt tốt |
-| **Embeddings** | Google text-embedding-004 | Miễn phí, chất lượng tốt |
-
-### Infrastructure
-
-| Thành phần | Công nghệ | Tại sao chọn |
-|-----------|-----------|--------------|
-| **Container** | Docker + Docker Compose | Chạy PostgreSQL, Qdrant dễ dàng, 1 lệnh setup |
-| **Java Runtime** | JDK 21 (LTS) | Long-Term Support, virtual threads, records |
 
 ---
 
-# Phase 2 — Database Design 
-
-## 2.1 Entity Relationship Diagram (ERD)
+# Phase 2 — Database Design (ERD & Entity Specifications)
 
 ```mermaid
 erDiagram
     DOCUMENT ||--o{ DOCUMENT_CHUNK : contains
     CONVERSATION ||--o{ CHAT_MESSAGE : contains
     CONVERSATION }o--o{ DOCUMENT : references
+    DOCUMENT ||--o{ GENERATED_CONTENT : produces
 
     DOCUMENT {
         uuid id PK "UUID tự sinh"
-        string filename "Tên file gốc"
-        string file_path "Đường dẫn lưu trữ"
-        string content_type "application/pdf, text/plain..."
-        bigint file_size "Kích thước file (bytes)"
-        string status "UPLOADING | PROCESSING | READY | ERROR"
-        int chunk_count "Số chunks đã tạo"
-        string error_message "Lỗi nếu processing fail"
-        timestamp created_at "Thời gian upload"
+        string title "Tiêu đề tài liệu"
+        string file_name "Tên file gốc"
+        string file_path "Đường dẫn file trên disk"
+        string content_type "MIME: application/pdf, text/plain"
+        string doc_type "Enum: PDF, TXT, NOTE, URL"
+        bigint file_size "Kích thước bytes"
+        string status "Enum: UPLOADING, PROCESSING, READY, ERROR"
+        int chunk_count "Số lượng chunks đã tạo"
+        text error_message "Thông báo lỗi nếu xử lý fail"
+        string source_url "URL gốc (nếu là web note)"
+        timestamp created_at "Thời gian tạo"
         timestamp updated_at "Thời gian cập nhật"
     }
 
     DOCUMENT_CHUNK {
-        uuid id PK
-        uuid document_id FK "Thuộc document nào"
-        int chunk_index "Thứ tự chunk trong document"
-        text content "Nội dung text của chunk"
-        string vector_id "ID trong Qdrant"
-        int token_count "Số tokens trong chunk"
-        timestamp created_at
+        uuid id PK "UUID tự sinh"
+        uuid document_id FK "Thuộc tài liệu nào"
+        int chunk_index "Thứ tự chunk (0, 1, 2...)"
+        int page_number "Trang tài liệu (Bắt buộc cho PDF citations)"
+        string vector_id "ID vector tương ứng trong Qdrant"
+        int token_count "Số lượng tokens ước tính"
+        timestamp created_at "Thời gian tạo"
     }
 
     CONVERSATION {
-        uuid id PK
-        string title "Tiêu đề conversation"
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    CHAT_MESSAGE {
-        uuid id PK
-        uuid conversation_id FK "Thuộc conversation nào"
-        string role "user | assistant"
-        text content "Nội dung tin nhắn"
-        json sources "Trích dẫn nguồn từ documents"
-        timestamp created_at
+        uuid id PK "UUID tự sinh"
+        string title "Tiêu đề cuộc trò chuyện"
+        timestamp created_at "Thời gian tạo"
+        timestamp updated_at "Thời gian cập nhật"
     }
 
     CONVERSATION_DOCUMENT {
-        uuid conversation_id FK
-        uuid document_id FK
+        uuid conversation_id FK "PK, FK"
+        uuid document_id FK "PK, FK"
+    }
+
+    CHAT_MESSAGE {
+        uuid id PK "UUID tự sinh"
+        uuid conversation_id FK "Thuộc cuộc trò chuyện nào"
+        string role "Enum: USER, ASSISTANT, SYSTEM"
+        text content "Nội dung câu hỏi hoặc câu trả lời"
+        text sources "JSON trích dẫn: [{fileName, pageNumber, snippet, score}]"
+        timestamp created_at "Thời gian gửi"
+    }
+
+    GENERATED_CONTENT {
+        uuid id PK "UUID tự sinh"
+        uuid document_id FK "Tài liệu nguồn (nullable nếu tổng hợp nhiều doc)"
+        string content_type "Enum: SUMMARY, QUIZ, FLASHCARD, CHEATSHEET"
+        string title "Tiêu đề nội dung sinh ra"
+        text content_data "Dữ liệu JSON chứa bộ câu hỏi hoặc thẻ nhớ"
+        timestamp created_at "Thời gian tạo"
     }
 ```
 
-## 2.2 Giải thích thiết kế
+### 2.1 Đặc Tả Chi Tiết 5 Entities Trong Hệ Thống
 
-| Quyết định | Lý do |
-|-----------|-------|
-| Dùng **UUID** thay vì auto-increment ID | Không đoán được, an toàn hơn. Không bị conflict khi merge data |
-| Tách **DOCUMENT_CHUNK** riêng | Để track chunks đã tạo, dễ xóa/re-index. Lưu cả `vector_id` để sync với Qdrant |
-| **status** là string enum | Track trạng thái processing: UPLOADING → PROCESSING → READY/ERROR |
-| **CONVERSATION_DOCUMENT** (join table) | Many-to-many: 1 conversation có thể dùng nhiều documents, 1 document dùng trong nhiều conversations |
-| **sources** là JSON | Linh hoạt — lưu array trích dẫn `[{docId, chunkId, text, score}]` |
-
----
-
-# Phase 3 — API Design 
-
-
-## 3.1 RESTful API Conventions
-
-```
-Base URL: http://localhost:8080/api/v1
-
-HTTP Methods:
-  GET    → Đọc dữ liệu (không thay đổi gì)
-  POST   → Tạo mới
-  PUT    → Cập nhật toàn bộ
-  PATCH  → Cập nhật 1 phần
-  DELETE → Xóa
-
-Status Codes:
-  200 OK           → Thành công
-  201 Created      → Tạo mới thành công
-  202 Accepted     → Đã nhận request, đang xử lý async
-  400 Bad Request  → Input không hợp lệ
-  404 Not Found    → Resource không tồn tại
-  500 Server Error → Lỗi server
-```
-
-## 3.2 API Endpoints 
-
-### Documents API
-
-#### `POST /api/v1/documents` — Upload tài liệu
-
-```
-Request:
-  Content-Type: multipart/form-data
-  Body:
-    file: (binary) — file PDF hoặc TXT, max 20MB
-
-Response: 202 Accepted
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "filename": "java-design-patterns.pdf",
-  "contentType": "application/pdf",
-  "fileSize": 2048576,
-  "status": "PROCESSING",
-  "createdAt": "2026-08-24T00:30:00Z"
-}
-
-Errors:
-  400 — File quá lớn hoặc định dạng không hỗ trợ
-  500 — Lỗi lưu file
-```
-
-#### `GET /api/v1/documents` — Lấy danh sách tài liệu
-
-```
-Request:
-  Query params:
-    page (optional, default=0)
-    size (optional, default=20)
-    status (optional) — filter theo status
-
-Response: 200 OK
-{
-  "content": [
-    {
-      "id": "550e8400-...",
-      "filename": "java-design-patterns.pdf",
-      "contentType": "application/pdf",
-      "fileSize": 2048576,
-      "status": "READY",
-      "chunkCount": 42,
-      "createdAt": "2026-08-24T00:30:00Z"
-    }
-  ],
-  "totalElements": 5,
-  "totalPages": 1,
-  "currentPage": 0
-}
-```
-
-#### `GET /api/v1/documents/{id}` — Xem chi tiết 1 tài liệu
-
-```
-Response: 200 OK
-{
-  "id": "550e8400-...",
-  "filename": "java-design-patterns.pdf",
-  "contentType": "application/pdf",
-  "fileSize": 2048576,
-  "status": "READY",
-  "chunkCount": 42,
-  "errorMessage": null,
-  "createdAt": "2026-08-24T00:30:00Z",
-  "updatedAt": "2026-08-24T00:30:15Z"
-}
-```
-
-#### `DELETE /api/v1/documents/{id}` — Xóa tài liệu
-
-```
-Response: 204 No Content
-
-Side effects:
-  - Xóa file trên disk
-  - Xóa record trong PostgreSQL
-  - Xóa vectors trong Qdrant (gọi AI Service)
-```
+#### 1. Entity `Document` (Bảng `document`)
+* **Package**: `com.smartdoc.api.modules.document.entities`
+* **Mục đích**: Lưu trữ thông tin tài liệu đã tải lên, đường dẫn file vật lý và trạng thái nhúng vector.
+* **Các trường dữ liệu**:
+  * `id`: `UUID` (PK, tự sinh)
+  * `title`: `String` (Tiêu đề hiển thị)
+  * `fileName`: `String` (Tên file gốc, nullable = false)
+  * `filePath`: `String` (Đường dẫn lưu trên disk, nullable = false)
+  * `contentType`: `String` (MIME type, ví dụ: `application/pdf`)
+  * `fileSize`: `Long` (Kích thước byte)
+  * `status`: `DocumentStatus` (`@Enumerated(EnumType.STRING)`, nullable = false)
+  * `docType`: `DocumentType` (`@Enumerated(EnumType.STRING)`: `PDF`, `TXT`, `NOTE`, `URL`)
+  * `chunkCount`: `int` (Số lượng chunk sau khi cắt)
+  * `errorMessage`: `String` (`columnDefinition = "TEXT"`)
+  * `createdAt`, `updatedAt`: `LocalDateTime` (Audit timestamps)
+* **Quan hệ JPA**:
+  * `@OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true)` tới `List<DocumentChunk> chunks`
+  * `@ManyToMany(mappedBy = "documents")` tới `Set<Conversation> conversations`
 
 ---
 
-### Chat API
+#### 2. Entity `DocumentChunk` (Bảng `document_chunk`)
+* **Package**: `com.smartdoc.api.modules.document.entities`
+* **Mục đích**: Theo dõi vết từng mảnh văn bản (chunk) đã cắt từ document, lưu số trang để trích dẫn (citation) và vector_id tương ứng trong Qdrant.
+* **Các trường dữ liệu**:
+  * `id`: `UUID` (PK, tự sinh)
+  * `chunkIndex`: `int` (Thứ tự từ 0 đến N)
+  * `pageNumber`: `int` (Số trang trong file PDF gốc, cực kỳ quan trọng cho citation)
+  * `vectorId`: `String` (UUID của point lưu trong Qdrant)
+  * `tokenCount`: `int` (Số token của chunk)
+  * `createdAt`: `LocalDateTime` (`@CreationTimestamp`)
+* **Quan hệ JPA**:
+  * `@ManyToOne(fetch = FetchType.LAZY)` tới `Document document` (`@JoinColumn(name = "document_id", nullable = false)`)
 
-#### `POST /api/v1/conversations` — Tạo conversation mới
+---
+
+#### 3. Entity `Conversation` (Bảng `conversation`)
+* **Package**: `com.smartdoc.api.modules.conversation.entities`
+* **Mục đích**: Đại diện cho một phiên chat hỏi đáp (tương tự 1 đoạn chat trên ChatGPT/NotebookLM).
+* **Các trường dữ liệu**:
+  * `id`: `UUID` (PK, tự sinh)
+  * `title`: `String` (Tiêu đề cuộc trò chuyện, ví dụ: "Hỏi về Design Patterns")
+  * `createdAt`, `updatedAt`: `LocalDateTime`
+* **Quan hệ JPA**:
+  * `@ManyToMany` tới `Set<Document> documents`: Bảng phụ `conversation_documents` lưu danh sách các tài liệu được gán vào cuộc chat này để giới hạn phạm vi tìm kiếm vector.
+  * `@OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)` tới `List<ChatMessage> messages` (Xếp theo thời gian tăng dần).
+
+---
+
+#### 4. Entity `ChatMessage` (Bảng `chat_message`)
+* **Package**: `com.smartdoc.api.modules.conversation.entities`
+* **Mục đích**: Lưu từng lượt tin nhắn (turn) của người dùng và câu trả lời của AI kèm danh sách nguồn trích dẫn.
+* **Các trường dữ liệu**:
+  * `id`: `UUID` (PK, tự sinh)
+  * `role`: `MessageRole` (`@Enumerated(EnumType.STRING)`: `USER`, `ASSISTANT`, `SYSTEM`)
+  * `content`: `String` (`columnDefinition = "TEXT"`, nullable = false)
+  * `sources`: `String` (`columnDefinition = "TEXT"`, lưu JSON danh sách trích dẫn: tên file, số trang, đoạn văn bản trích dẫn, điểm tương đồng)
+  * `createdAt`: `LocalDateTime` (`@CreationTimestamp`)
+* **Quan hệ JPA**:
+  * `@ManyToOne(fetch = FetchType.LAZY)` tới `Conversation conversation` (`@JoinColumn(name = "conversation_id", nullable = false)`)
+
+---
+
+#### 5. Entity `GeneratedContent` (Bảng `generated_content`)
+* **Package**: `com.smartdoc.api.modules.content.entities`
+* **Mục đích**: Lưu trữ nội dung AI tự động tạo ra từ tài liệu (Quiz trắc nghiệm, tóm tắt, flashcard).
+* **Các trường dữ liệu**:
+  * `id`: `UUID` (PK, tự sinh)
+  * `title`: `String` (Tiêu đề, ví dụ: "Bộ Quiz 10 câu ôn tập Singleton Pattern")
+  * `contentType`: `ContentType` (`@Enumerated(EnumType.STRING)`: `SUMMARY`, `QUIZ`, `FLASHCARD`, `CHEATSHEET`)
+  * `contentData`: `String` (`columnDefinition = "TEXT"`, lưu cấu trúc JSON của bộ câu hỏi/thẻ nhớ để client render)
+  * `createdAt`: `LocalDateTime` (`@CreationTimestamp`)
+* **Quan hệ JPA**:
+  * `@ManyToOne(fetch = FetchType.LAZY)` tới `Document document` (`@JoinColumn(name = "document_id", nullable = true)`)
+
+---
+
+### 2.2 Best Practice: Lớp `BaseEntity` (Dùng Chung)
+Để không phải lặp lại các trường audit (`id`, `createdAt`, `updatedAt`) ở tất cả các entity, bạn có thể tạo một abstract class:
+* **Package**: `com.smartdoc.api.common.entities.BaseEntity`
+* Đánh dấu `@MappedSuperclass`
+* Chứa `@Id`, `@CreationTimestamp`, `@UpdateTimestamp` để các Entity khác chỉ cần `extends BaseEntity`.
+
+---
+
+# Phase 3 — API Contracts (Đơn giản hóa)
+
+### 3.1 Java Backend APIs
+* `POST /api/v1/documents` (`multipart/form-data`):
+  * Nhận file → Lưu disk → Tạo record DB `status = PROCESSING` → Trả `202 Accepted` ngay.
+  * Method `@Async`: Gọi `POST http://localhost:8000/ingest`. Nếu thành công đổi `status = READY`, nếu lỗi đổi `status = ERROR`.
+* `GET /api/v1/documents`: Lấy danh sách tài liệu (kèm phân trang).
+* `DELETE /api/v1/documents/{id}`: Xóa file disk, xóa DB, gọi xóa Qdrant.
+* `POST /api/v1/conversations/{id}/messages`: Nhận câu hỏi, gọi Python `/chat` và stream SSE về cho client.
+
+### 3.2 Python AI Service APIs
+* `POST /ingest`:
+  * Body: `{ "documentId": "uuid", "filePath": "...", "contentType": "application/pdf" }`
+  * Đọc PDF từng trang → Chia chunk → Tạo vector embedding → Lưu Qdrant.
+* `POST /chat`:
+  * Body: `{ "query": "...", "documentIds": [...], "chatHistory": [...] }`
+  * Vector search Qdrant → Ghép prompt → Stream câu trả lời từ Gemini.
+
+---
+
+# Phase 4 — Lộ Trình Triển Khai (M0 → M6)
 
 ```
-Request:
-{
-  "title": "Hỏi về Design Patterns",      // optional
-  "documentIds": ["550e8400-...", "..."]    // documents để AI tham khảo
-}
-
-Response: 201 Created
-{
-  "id": "660e8400-...",
-  "title": "Hỏi về Design Patterns",
-  "documentIds": ["550e8400-..."],
-  "createdAt": "2026-08-24T00:35:00Z"
-}
-```
-
-#### `POST /api/v1/conversations/{id}/messages` — Gửi tin nhắn & nhận AI response
-
-```
-Request:
-{
-  "content": "Tóm tắt chương 3 về Singleton Pattern?"
-}
-
-Response: 200 OK (text/event-stream — SSE)
-data: {"type": "token", "content": "Chương"}
-data: {"type": "token", "content": " 3"}
-data: {"type": "token", "content": " giới"}
-data: {"type": "token", "content": " thiệu"}
-...
-data: {"type": "sources", "content": [{"documentId": "...", "chunkText": "...", "score": 0.92}]}
-data: {"type": "done"}
-```
-
-#### `GET /api/v1/conversations/{id}/messages` — Lấy lịch sử chat
-
-```
-Response: 200 OK
-{
-  "messages": [
-    {
-      "id": "...",
-      "role": "user",
-      "content": "Tóm tắt chương 3?",
-      "createdAt": "2026-08-24T00:35:10Z"
-    },
-    {
-      "id": "...",
-      "role": "assistant",
-      "content": "Chương 3 giới thiệu về Singleton Pattern...",
-      "sources": [{"documentId": "...", "chunkText": "..."}],
-      "createdAt": "2026-08-24T00:35:12Z"
-    }
-  ]
-}
+       M0: Setup Hạ Tầng (Docker Postgres, Qdrant + Skeleton 2 Project)
+                                 │
+                                 ▼
+       M1: The Spike (1 Script Python đọc PDF → Qdrant → Gemini → Output)
+                                 │
+                                 ▼
+       M2: Document Management (Upload PDF/TXT, lưu DB, gọi Python xử lý)
+                                 │
+                                 ▼
+       M3: Chat & Streaming (SSE Stream từ Python qua Java tới Client)
+                                 │
+                                 ▼
+       M4: Minimal Web UI (Web đơn giản để Upload & Chat)
+                                 │
+                                 ▼
+       M5: Content Generation (Tạo Quiz JSON, Tóm tắt)
+                                 │
+                                 ▼
+       M6: Production-Ready & Hardening (Timeout, Retry, Circuit Breaker...)
 ```
 
 ---
 
-### Internal AI Service API (Backend → AI Service)
-
-
-#### `POST /ingest` — Xử lý tài liệu
-
-```
-Request:
-{
-  "documentId": "550e8400-...",
-  "filePath": "/storage/documents/550e8400-.../java-design-patterns.pdf",
-  "contentType": "application/pdf"
-}
-
-Response: 200 OK
-{
-  "documentId": "550e8400-...",
-  "chunksCreated": 42,
-  "vectorIds": ["vec-001", "vec-002", ...],
-  "status": "success"
-}
-```
-
-#### `POST /chat` — Chat với AI (streaming)
-
-```
-Request:
-{
-  "query": "Tóm tắt chương 3?",
-  "documentIds": ["550e8400-..."],
-  "chatHistory": [
-    {"role": "user", "content": "..."},
-    {"role": "assistant", "content": "..."}
-  ],
-  "topK": 5
-}
-
-Response: text/event-stream (SSE)
-```
-
-#### `DELETE /vectors/{documentId}` — Xóa vectors
-
-```
-Response: 200 OK
-{"deletedCount": 42}
-```
+### 🟢 Milestone M0: Setup Hạ Tầng & Khung Dự Án (1 - 2 ngày)
+* **Mục tiêu**: Bật được DB và chạy được 2 ứng dụng Java + Python ở mức cơ bản.
+* **Công việc**:
+  1. Chạy `docker compose up -d` (Postgres 18, Qdrant v1.19.1).
+  2. Tạo project **Spring Boot 4.x** (Dependencies: Web, Data JPA, PostgreSQL Driver, Validation, Flyway).
+  3. Tạo project **FastAPI** (`fastapi`, `uvicorn`, `qdrant-client`, `google-genai`).
+  4. Test: Java gọi `GET http://localhost:8000/health` thành công.
 
 ---
 
-# Phase 4 — Development Sprints 
+### 🎯 Milestone M1: The Spike — Thử Nghiệm RAG Thuần Túy (2 - 3 ngày)
+> [!IMPORTANT]
+> Viết 1 script Python độc lập để kiểm chứng luồng RAG với file PDF môn học thật trước khi ghép nối hệ thống.
 
-## Sprint 0: Environment Setup
+* **Công việc**:
+  1. Viết script đọc 1 file PDF (trích xuất text và số trang `page`).
+  2. Chia chunk (800 tokens) kèm metadata `{page: N}`.
+  3. Tạo embedding với `gemini-embedding-001` → lưu vào Qdrant.
+  4. Viết hàm query: lấy câu hỏi → search Qdrant → gửi context vào `gemini-3.8-flash` → in câu trả lời ra terminal kèm trích dẫn số trang.
+* **Kết quả**: Bạn hiểu rõ 100% cách RAG hoạt động trong thực tế.
 
-- [ ] Cài đặt **JDK 21** (recommend: SDKMAN hoặc Homebrew)
-- [ ] Cài đặt **Gradle 8.x**
-- [ ] Cài đặt **Docker Desktop**
-- [ ] Cài đặt **Python 3.11+** (recommend: pyenv)
-- [ ] Cài đặt **IDE**: IntelliJ IDEA Community (Java) + VS Code (Python)
-- [ ] Cài đặt **Git** và tạo repository
-- [ ] Tạo **docker-compose.yml** chạy PostgreSQL + Qdrant
-- [ ] Verify: `docker compose up` → PostgreSQL + Qdrant chạy OK
-- [ ] Tạo file `.gitignore`, `README.md`
+---
 
-**Deliverable**: Chạy `docker compose up` thành công, kết nối được PostgreSQL từ terminal
+### 📦 Milestone M2: Quản Lý Tài Liệu (3 - 4 ngày)
+* **Mục tiêu**: Xây dựng luồng upload tài liệu hoàn chỉnh phía Java.
+* **Công việc**:
+  1. Viết Entity `Document` và `DocumentRepository` (áp dụng kiến thức JPA đã học).
+  2. `DocumentController`: Endpoint `POST /api/v1/documents` nhận file.
+  3. `DocumentService`:
+     - Lưu file vào thư mục `storage/`.
+     - Lưu DB trạng thái `PROCESSING`.
+     - Dùng `@Async` gọi sang Python `POST /ingest`.
+     - Python xử lý xong trả về 200 → Java cập nhật DB thành `READY`.
+  4. Endpoint `DELETE /api/v1/documents/{id}`: Xóa DB, xóa file.
+* **Kết quả**: Dùng Swagger UI/Postman upload file PDF → thấy file được lưu, DB đổi sang `READY`, Qdrant có vector.
+
+---
+
+### 💬 Milestone M3: Chat Hỏi Đáp & Streaming SSE (3 - 4 ngày)
+* **Mục tiêu**: Chat với AI có streaming từng chữ.
+* **Công việc**:
+  1. Python FastAPI: Endpoint `POST /chat` nhận câu hỏi, tìm vector trong Qdrant, stream token từ Gemini trả về qua Server-Sent Events (SSE).
+  2. Java Spring Boot: Nhận SSE stream từ Python bằng `WebClient` và forward thẳng về cho client.
+  3. Lưu lịch sử câu hỏi và câu trả lời vào bảng `chat_messages`.
+* **Kết quả**: Dùng curl hoặc test tool thấy câu trả lời của AI nhảy ra từng chữ mượt mà.
+
+---
+
+### 🎨 Milestone M4: Giao Diện Web Đơn Giản (3 - 5 ngày)
+* **Mục tiêu**: Không cần dùng Postman/Swagger nữa, thao tác trực tiếp trên trình duyệt.
+* **Công việc**:
+  1. Tạo giao diện web đơn giản (HTML/JS trong `src/main/resources/static` hoặc React Vite):
+     - Khu vực kéo thả upload file PDF + xem danh sách tài liệu đã upload.
+     - Khung chat hiển thị tin nhắn user và AI (streaming text + hiển thị tên file và số trang trích dẫn).
+* **Kết quả**: Ứng dụng đã hoàn chỉnh luồng nghiệp vụ chính (MVP)!
+
+---
+
+### 📝 Milestone M5: Content Generation — Tạo Quiz & Tóm Tắt (3 - 4 ngày)
+* **Mục tiêu**: Thêm tính năng học tập ôn thi.
+* **Công việc**:
+  1. Endpoint yêu cầu AI tóm tắt tài liệu đã chọn.
+  2. Endpoint yêu cầu AI sinh 10 câu trắc nghiệm (Structured JSON) từ nội dung tài liệu.
+  3. Lưu kết quả vào bảng `generated_content`.
+
+---
+
+### 🛡️ Milestone M6: Nâng Cấp Lên Chuẩn Production-Ready (Sau khi MVP đã chạy ổn)
+* **Mục tiêu**: Nâng cấp hệ thống để chạy bền bỉ, không sợ rớt mạng hay sập service.
+* **Công việc**:
+  1. **Timeouts**: Cấu hình Connect Timeout 3s, Read Timeout 60s cho `WebClient`.
+  2. **Retry & Backoff**: Dùng `@Retry` (Resilience4j) tự động thử lại 3 lần nếu Python service bận.
+  3. **Circuit Breaker**: Tự động ngắt mạch nếu Python service bị sập liên tục.
+  4. **Idempotency**: Tránh đúp vector khi retry ingest tài liệu.
+  5. **Watchdog**: Job `@Scheduled` quét và đổi trạng thái các tài liệu bị kẹt ở `PROCESSING` quá lâu thành `ERROR`.
+  6. **Security**: Chặn SSRF khi crawl URL, kiểm tra magic bytes của file upload.
+
+---
+
+# Phase 6 — Docker Configuration
+
+File `docker/docker-compose.yml` giữ nguyên gọn gàng:
 
 ```yaml
-# docker/docker-compose.yml
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
+    container_name: smartdoc_postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: smartdoc
-      POSTGRES_USER: smartdoc
-      POSTGRES_PASSWORD: smartdoc_dev
+      - POSTGRES_DB=smartdoc
+      - POSTGRES_USER=smartdoc
+      - POSTGRES_PASSWORD=smartdoc_dev
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.19.1
+    container_name: smartdoc_qdrant
+    restart: unless-stopped
     ports:
-      - "6333:6333"  # REST API
-      - "6334:6334"  # gRPC
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
 
-volumes:
   postgres_data:
   qdrant_data:
 ```
-
----
-
-## Sprint 1: Java Backend Foundation 
-
-
-### Tasks:
-
-- [ ] **Init Spring Boot project** (start.spring.io hoặc IntelliJ)
-  - Dependencies: Web, JPA, PostgreSQL, Validation, WebFlux, Flyway
-- [ ] **Cấu trúc package** theo layers:
-  ```
-  com.smartdoc/
-  ├── controller/      # REST endpoints
-  ├── service/         # Business logic
-  ├── repository/      # Database access
-  ├── model/
-  │   ├── entity/      # JPA entities (DB tables)
-  │   ├── dto/         # Data Transfer Objects (API request/response)
-  │   └── enums/       # Enums (DocumentStatus...)
-  ├── config/          # Configuration classes
-  ├── exception/       # Custom exceptions + handler
-  └── SmartDocApp.java # Main class
-  ```
-- [ ] **Tạo DB migration** (Flyway) — tạo tables từ ERD ở Phase 2
-- [ ] **Tạo Entity classes**: Document, DocumentChunk, Conversation, ChatMessage
-- [ ] **Tạo Repository interfaces**: DocumentRepository, ConversationRepository...
-- [ ] **Tạo Document API**:
-  - `POST /api/v1/documents` — Upload file, lưu vào disk + DB
-  - `GET /api/v1/documents` — List documents (có pagination)
-  - `GET /api/v1/documents/{id}` — Get document detail
-  - `DELETE /api/v1/documents/{id}` — Delete document
-- [ ] **Global Exception Handler** — trả error response chuẩn
-- [ ] **Unit tests** cho Service layer
-
-**Deliverable**: Dùng Postman/curl upload file → thấy record trong DB → list documents → xóa document
-
----
-
-## Sprint 2: Python AI Service 
-
-
-### Tasks:
-
-- [ ] **Init Python project** với FastAPI
-  ```
-  ai-service/
-  ├── src/
-  │   ├── main.py           # FastAPI app
-  │   ├── routers/
-  │   │   ├── ingest.py     # Document ingestion endpoints
-  │   │   └── chat.py       # Chat endpoints
-  │   ├── services/
-  │   │   ├── chunker.py    # Text chunking logic
-  │   │   ├── embedder.py   # Embedding generation
-  │   │   ├── retriever.py  # Vector search
-  │   │   └── generator.py  # LLM response generation
-  │   ├── agents/
-  │   │   └── rag_agent.py  # LangGraph RAG agent
-  │   └── config.py         # Settings
-  ├── requirements.txt
-  └── Dockerfile
-  ```
-- [ ] **Document Ingestion Pipeline**:
-  - Parse PDF (PyPDF2/pdfplumber) và TXT
-  - Chunk text (RecursiveCharacterTextSplitter, 500 tokens, 50 overlap)
-  - Generate embeddings (Google text-embedding-004)
-  - Upsert vào Qdrant
-- [ ] **RAG Chat Pipeline**:
-  - Nhận query → tạo embedding → search Qdrant (top_k=5)
-  - Build prompt: System + Retrieved chunks + User query
-  - Call Gemini → stream response
-- [ ] **LangGraph Agent** (basic):
-  - State: query, retrieved_docs, response
-  - Nodes: retrieve → generate
-  - Edges: conditional (có đủ context? → generate, thiếu → retrieve thêm)
-- [ ] **API endpoints**: `/ingest`, `/chat`, `/vectors/{docId}` (DELETE)
-
-**Deliverable**: Gọi API ingest 1 file → thấy vectors trong Qdrant → gọi API chat → nhận streaming response
-
----
-
-## Sprint 3: Integration — Kết nối Java ↔ Python 
-
-
-### Tasks:
-
-- [ ] **Java → Python HTTP Client** (WebClient):
-  - Gọi `/ingest` sau khi upload file
-  - Gọi `/chat` và forward SSE stream
-  - Gọi `/vectors/{docId}` khi xóa document
-- [ ] **Async processing**: Upload file → trả 202 → xử lý background → update status
-- [ ] **Chat API với SSE streaming**:
-  - `POST /api/v1/conversations/{id}/messages`
-  - Java nhận SSE từ Python → forward tới Frontend
-- [ ] **Conversation & Message APIs**:
-  - Tạo conversation, lấy messages, lấy list conversations
-- [ ] **Error handling**: AI Service down → Java trả lỗi thân thiện
-- [ ] **Integration tests**: Full flow upload → chat
-
-**Deliverable**: Upload PDF qua Java API → AI xử lý → Chat qua Java API → nhận streaming answer
-
----
-
-## Sprint 4: Frontend 
-
-
-### Tasks:
-
-- [ ] **Init React + Vite project**
-- [ ] **Design System**: Colors, typography, spacing
-- [ ] **Chat Page**:
-  - Message list (user bubbles + AI bubbles)
-  - Input box + Send button
-  - Streaming text animation
-  - Source citations expandable
-- [ ] **Document Manager Page**:
-  - Upload area (drag & drop)
-  - Upload progress bar
-  - Document list với status badges
-  - Delete confirmation modal
-- [ ] **Sidebar**: Conversation list, new conversation button
-- [ ] **Responsive design**: Desktop + Mobile
-- [ ] **API integration**: Kết nối tất cả APIs
-
-**Deliverable**: Web app hoàn chỉnh — upload doc, chat với AI, thấy citations
-
----
-
-## Sprint 5: Polish & Advanced Features 
-
-### Tasks:
-
-- [ ] **LangGraph nâng cao**:
-  - Multi-step reasoning (hỏi lại nếu không rõ)
-  - Conversation memory (nhớ context trước)
-  - Tool calling (tóm tắt, so sánh, trích xuất)
-- [ ] **Hỗ trợ thêm file types**: Word (.docx), Markdown (.md)
-- [ ] **Citation UI**: Hiện nguồn trích dẫn đẹp, click để xem chunk gốc
-- [ ] **Search**: Tìm kiếm trong documents đã upload
-- [ ] **Error handling UX**: Loading states, error messages, retry
-- [ ] **Performance**: Caching, lazy loading
-- [ ] **Documentation**: README, API docs, setup guide
-
-**Deliverable**: App hoàn thiện, có thể demo cho bạn bè
-
----
-
-# Phase 5 — Testing Strategy 
-
-
-```mermaid
-graph TB
-    subgraph Pyramid["Testing Pyramid"]
-        E2E["🔺 E2E Tests (ít nhất)\nFull flow: upload → chat → verify"]
-        INT["🔶 Integration Tests (vừa)\nAPI endpoints + DB + service calls"]
-        UNIT["🟩 Unit Tests (nhiều nhất)\nService logic, chunking, parsing"]
-    end
-
-    style E2E fill:#e74c3c,color:white
-    style INT fill:#f39c12,color:white
-    style UNIT fill:#27ae60,color:white
-```
-
-### Test Plan
-
-| Layer | Tool | Test gì | Số lượng |
-|-------|------|---------|----------|
-| **Unit (Java)** | JUnit 5 + Mockito | Service methods, validation, DTOs | ~30 tests |
-| **Unit (Python)** | pytest | Chunking, embedding, retrieval logic | ~20 tests |
-| **Integration (Java)** | Spring Boot Test + Testcontainers | API endpoints + real DB | ~15 tests |
-| **Integration (Python)** | pytest + httpx | API endpoints + mock Qdrant | ~10 tests |
-| **E2E** | Manual + Script | Upload → Process → Chat → Verify | ~5 flows |
-
----
-
-# Phase 6 — DevOps & Deployment
-
-## 6.1 Local Development Setup
-
-```mermaid
-graph LR
-    Dev["💻 Developer Machine"]
-    
-    subgraph Docker["Docker Compose"]
-        PG["PostgreSQL :5432"]
-        QD["Qdrant :6333"]
-    end
-    
-    subgraph Local["Local Processes"]
-        BE["Java Backend :8080"]
-        AI["Python AI :8000"]
-        FE["React Dev Server :3000"]
-    end
-    
-    Dev --> FE
-    FE --> BE
-    BE --> AI
-    BE --> PG
-    AI --> QD
-```
-
-**Startup commands**:
-```bash
-# Terminal 1: Infrastructure
-cd docker && docker compose up
-
-# Terminal 2: Java Backend
-cd backend-api && ./gradlew bootRun
-
-# Terminal 3: Python AI Service
-cd ai-service && uvicorn src.main:app --reload --port 8000
-
-# Terminal 4: Frontend
-cd frontend && npm run dev
-```
-
-## 6.2 File Structure Hoàn Chỉnh
-
-```
-smart-doc-assistant/
-├── backend-api/                    # Java Spring Boot
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── java/com/smartdoc/
-│   │   │   │   ├── controller/
-│   │   │   │   │   ├── DocumentController.java
-│   │   │   │   │   ├── ConversationController.java
-│   │   │   │   │   └── ChatController.java
-│   │   │   │   ├── service/
-│   │   │   │   │   ├── DocumentService.java
-│   │   │   │   │   ├── ChatService.java
-│   │   │   │   │   ├── ConversationService.java
-│   │   │   │   │   └── AiServiceClient.java
-│   │   │   │   ├── repository/
-│   │   │   │   │   ├── DocumentRepository.java
-│   │   │   │   │   ├── ChatMessageRepository.java
-│   │   │   │   │   └── ConversationRepository.java
-│   │   │   │   ├── model/
-│   │   │   │   │   ├── entity/
-│   │   │   │   │   │   ├── Document.java
-│   │   │   │   │   │   ├── DocumentChunk.java
-│   │   │   │   │   │   ├── Conversation.java
-│   │   │   │   │   │   └── ChatMessage.java
-│   │   │   │   │   ├── dto/
-│   │   │   │   │   │   ├── DocumentUploadResponse.java
-│   │   │   │   │   │   ├── ChatRequest.java
-│   │   │   │   │   │   └── ChatResponse.java
-│   │   │   │   │   └── enums/
-│   │   │   │   │       └── DocumentStatus.java
-│   │   │   │   ├── config/
-│   │   │   │   │   ├── WebConfig.java
-│   │   │   │   │   └── AiServiceConfig.java
-│   │   │   │   ├── exception/
-│   │   │   │   │   ├── GlobalExceptionHandler.java
-│   │   │   │   │   └── DocumentNotFoundException.java
-│   │   │   │   └── SmartDocApplication.java
-│   │   │   └── resources/
-│   │   │       ├── application.yml
-│   │   │       └── db/migration/
-│   │   │           └── V1__init_schema.sql
-│   │   └── test/
-│   │       └── java/com/smartdoc/
-│   │           ├── service/
-│   │           │   └── DocumentServiceTest.java
-│   │           └── controller/
-│   │               └── DocumentControllerTest.java
-│   ├── build.gradle.kts
-│   └── settings.gradle.kts
-│
-├── ai-service/                     # Python FastAPI
-│   ├── src/
-│   │   ├── main.py
-│   │   ├── config.py
-│   │   ├── routers/
-│   │   │   ├── ingest.py
-│   │   │   └── chat.py
-│   │   ├── services/
-│   │   │   ├── document_parser.py
-│   │   │   ├── chunker.py
-│   │   │   ├── embedder.py
-│   │   │   ├── retriever.py
-│   │   │   └── generator.py
-│   │   └── agents/
-│   │       └── rag_agent.py
-│   ├── tests/
-│   │   ├── test_chunker.py
-│   │   └── test_retriever.py
-│   ├── requirements.txt
-│   └── Dockerfile
-│
-├── frontend/                       # React + Vite
-│   ├── src/
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   ├── index.css
-│   │   ├── components/
-│   │   │   ├── ChatMessage.jsx
-│   │   │   ├── ChatInput.jsx
-│   │   │   ├── DocumentUpload.jsx
-│   │   │   ├── DocumentList.jsx
-│   │   │   └── Sidebar.jsx
-│   │   ├── pages/
-│   │   │   ├── ChatPage.jsx
-│   │   │   └── DocumentsPage.jsx
-│   │   └── services/
-│   │       └── api.js
-│   ├── package.json
-│   └── vite.config.js
-│
-├── docker/
-│   └── docker-compose.yml
-│
-├── docs/
-│   ├── architecture.md
-│   └── api-spec.yaml
-│
-├── scripts/
-│   ├── setup.sh                    # 1-click setup
-│   └── start-all.sh                # Start tất cả services
-│
-├── .gitignore
-└── README.md
-```
-
----
-
-# Glossary 
-
-
-| Thuật ngữ | Giải thích | Ví dụ |
-|-----------|-----------|-------|
-| **REST API** | Kiểu thiết kế API dùng HTTP methods (GET, POST...) để tương tác với resources | `GET /documents` → lấy danh sách |
-| **RAG** | Retrieval-Augmented Generation — lấy context từ documents rồi cho AI generate câu trả lời | Upload sách → hỏi AI → AI trả lời dựa trên nội dung sách |
-| **Embedding** | Biến text thành vector số (mảng số) để máy tính so sánh similarity | "Con mèo" → [0.2, 0.8, 0.1, ...] |
-| **Vector Store** | Database chuyên lưu và tìm kiếm vectors. Tìm text "giống nhau" bằng cách so sánh vectors | Qdrant, Pinecone, ChromaDB |
-| **Chunk** | Chia document dài thành các đoạn nhỏ (~500 tokens) để embedding hiệu quả | 1 file PDF 100 trang → 200 chunks |
-| **SSE** | Server-Sent Events — server gửi data liên tục tới client (streaming) | ChatGPT hiện text từng chữ |
-| **LangGraph** | Framework để xây AI agent có nhiều bước, có điều kiện, có memory | Agent: đọc câu hỏi → tìm context → suy nghĩ → trả lời |
-| **ORM** | Object-Relational Mapping — tương tác DB bằng objects thay vì viết SQL | `documentRepo.findById(id)` thay vì `SELECT * FROM documents WHERE id=...` |
-| **DTO** | Data Transfer Object — object chỉ chứa data, dùng để gửi/nhận qua API | `DocumentUploadResponse {id, filename, status}` |
-| **Migration** | Script thay đổi DB schema theo version, giống Git cho database | `V1__create_documents_table.sql` |
-| **Pagination** | Chia kết quả thành nhiều trang thay vì trả hết 1 lần | Trang 1: 20 items, trang 2: 20 items... |
-| **Spring Boot** | Java framework giúp tạo app nhanh, tự cấu hình mọi thứ | Chỉ cần annotation `@RestController` là có API |
-| **JPA/Hibernate** | Java ORM — map Java class sang DB table tự động | `@Entity class Document` → tạo table `documents` |
-| **Docker Compose** | Tool chạy nhiều containers cùng lúc bằng 1 file config | 1 lệnh `docker compose up` → PostgreSQL + Qdrant chạy |
-
