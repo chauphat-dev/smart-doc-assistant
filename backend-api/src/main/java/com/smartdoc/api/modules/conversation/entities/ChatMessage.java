@@ -32,6 +32,7 @@ public class ChatMessage {
     private String source;
 
     @CreationTimestamp
+    @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @ManyToOne(fetch = FetchType.LAZY)

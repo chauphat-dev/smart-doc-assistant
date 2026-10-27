@@ -18,6 +18,7 @@ import java.util.UUID;
 @Builder
 @ToString
 @Entity
+@Table(name ="generated_content")
 public class GeneratedContent {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

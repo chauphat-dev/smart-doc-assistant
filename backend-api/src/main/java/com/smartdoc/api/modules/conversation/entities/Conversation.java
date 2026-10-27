@@ -26,10 +26,25 @@ public class Conversation {
     private String title;
 
     @CreationTimestamp
+    @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || org.hibernate.Hibernate.getClass(this)!=org.hibernate.Hibernate.getClass(o)) return false;
+        Conversation conversation = (Conversation) o;
+        return Objects.equals(id, conversation.getId()) && Objects.equals(title, conversation.getTitle());
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
 
     @Builder.Default
     @ManyToMany

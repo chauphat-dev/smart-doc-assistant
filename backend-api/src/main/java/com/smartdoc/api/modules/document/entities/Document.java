@@ -53,11 +53,26 @@ public class Document {
     private String sourceUrl;
 
     @CreationTimestamp
-    @Column(nullable = false)
+    @Column(nullable = false,updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || org.hibernate.Hibernate.getClass(this)!=org.hibernate.Hibernate.getClass(o)) return false;
+        Document document = (Document) o;
+        return Objects.equals(id, document.getId());
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
+
+
 
     @Builder.Default
     @OneToMany(
@@ -79,4 +94,5 @@ public class Document {
     @OneToMany(mappedBy = "document")
     @ToString.Exclude
     private List<GeneratedContent>  generatedContents=new ArrayList<>();
+
 }
