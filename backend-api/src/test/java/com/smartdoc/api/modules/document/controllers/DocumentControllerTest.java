@@ -3,6 +3,7 @@ package com.smartdoc.api.modules.document.controllers;
 import com.smartdoc.api.common.exceptions.NotFoundException;
 import com.smartdoc.api.common.web.GlobalExceptionHandler;
 import com.smartdoc.api.modules.document.records.DocumentResponse;
+import com.smartdoc.api.modules.document.records.DocumentSummary;
 import com.smartdoc.api.modules.document.services.DocumentService;
 // Import các enum tương ứng trong entity/module document của dự án
 import com.smartdoc.api.modules.document.enums.DocumentStatus;
@@ -17,6 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.Mockito.verify;
@@ -26,6 +28,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+
+import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 
 @WebMvcTest(DocumentController.class)
 @Import(GlobalExceptionHandler.class)
@@ -110,5 +127,61 @@ class DocumentControllerTest {
                 .andExpect(jsonPath("$.title").value("Method Argument Type Mismatch"));
 
         verifyNoInteractions(documentService);
+    }
+
+
+    @Test
+    @DisplayName("GET /api/v1/documents - 200 OK và trả về danh sách phân trang thành công")
+    void getDocuments_ShouldReturnDocumentPage() throws Exception {
+        // 1. Arrange
+        UUID docId = UUID.randomUUID();
+        LocalDateTime now = LocalDateTime.now();
+
+        // Giả lập 1 bản ghi DocumentSummary (điều chỉnh các trường theo đúng record của dự án bạn)
+        DocumentSummary summary = new DocumentSummary(
+                docId,
+                "Báo cáo tài chính Q3",
+                "financial_report_q3.pdf",
+                DocumentType.PDF,
+                1048576L,
+                DocumentStatus.READY,
+                12,
+                now,
+                now
+        );
+
+        // Tạo đối tượng Page giả lập trả về từ Service
+        Page<DocumentSummary> mockPage = new PageImpl<>(
+                List.of(summary),
+                PageRequest.of(0, 10),
+                1L
+        );
+
+        // Mock Service: chấp nhận mọi tham số lọc và phân trang truyền vào
+        when(documentService.findAllByStatusAndType(any(), any(), any(Pageable.class)))
+                .thenReturn(mockPage);
+
+        // 2. Act & 3. Assert
+        mockMvc.perform(get("/api/v1/documents")
+                        .param("docType", "PDF")
+                        .param("status", "READY")
+                        .param("page", "0")
+                        .param("size", "10")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                // Kiểm tra mảng nội dung bên trong Page (mặc định Spring Data trả về trường "content")
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].id").value(docId.toString()))
+                .andExpect(jsonPath("$.content[0].title").value("Báo cáo tài chính Q3"))
+                .andExpect(jsonPath("$.content[0].fileName").value("financial_report_q3.pdf"))
+                // Kiểm tra metadata phân trang
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.number").value(0));
+
+        // Xác minh service được gọi đúng 1 lần
+        verify(documentService).findAllByStatusAndType(any(), any(), any(Pageable.class));
     }
 }
