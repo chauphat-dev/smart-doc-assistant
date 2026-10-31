@@ -6,6 +6,7 @@ import com.smartdoc.api.modules.document.enums.DocumentStatus;
 import com.smartdoc.api.modules.document.enums.DocumentType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.Hibernate;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -62,14 +63,16 @@ public class Document {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || org.hibernate.Hibernate.getClass(this)!=org.hibernate.Hibernate.getClass(o)) return false;
+        if  (o == null) return false;
+        if (Hibernate.getClass(this) != Hibernate.getClass(o)) return false;
+        if (this.id==null) return  false;
         Document document = (Document) o;
         return Objects.equals(id, document.getId());
     }
 
     @Override
     public int hashCode() {
-        return getClass().hashCode();
+        return Hibernate.getClass(this).hashCode();
     }
 
 

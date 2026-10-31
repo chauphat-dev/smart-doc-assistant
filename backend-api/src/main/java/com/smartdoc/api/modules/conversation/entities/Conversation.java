@@ -4,6 +4,7 @@ package com.smartdoc.api.modules.conversation.entities;
 import com.smartdoc.api.modules.document.entities.Document;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.Hibernate;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -36,14 +37,16 @@ public class Conversation {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || org.hibernate.Hibernate.getClass(this)!=org.hibernate.Hibernate.getClass(o)) return false;
+        if  (o == null) return false;
+        if (Hibernate.getClass(this) != Hibernate.getClass(o)) return false;
+        if (this.id==null) return  false;
         Conversation conversation = (Conversation) o;
-        return Objects.equals(id, conversation.getId()) && Objects.equals(title, conversation.getTitle());
+        return Objects.equals(id, conversation.getId());
     }
 
     @Override
     public int hashCode() {
-        return getClass().hashCode();
+        return Hibernate.getClass(this).hashCode();
     }
 
     @Builder.Default

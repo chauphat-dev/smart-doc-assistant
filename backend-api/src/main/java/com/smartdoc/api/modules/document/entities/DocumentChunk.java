@@ -3,10 +3,11 @@ package com.smartdoc.api.modules.document.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.Hibernate;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.UUID;
-import com.smartdoc.api.modules.document.entities.Document;
 
 @Getter
 @Setter
@@ -24,6 +25,21 @@ public class DocumentChunk {
     private int pageNumber;
     private String vectorId;
     private int tokenCount;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if  (o == null) return false;
+        if (Hibernate.getClass(this) != Hibernate.getClass(o)) return false;
+        if (this.id==null) return  false;
+        DocumentChunk chunk = (DocumentChunk) o;
+        return Objects.equals(id, chunk.getId());
+    }
+
+    @Override
+    public int hashCode() {
+        return Hibernate.getClass(this).hashCode();
+    }
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
