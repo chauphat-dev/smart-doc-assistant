@@ -1,0 +1,12 @@
+package com.smartdoc.api.modules.document.repositories;
+
+import com.smartdoc.api.modules.document.entities.Document;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.stereotype.Repository;
+
+
+import java.util.UUID;
+
+@Repository
+public interface DocumentRepository extends JpaRepository<Document, UUID>, JpaSpecificationExecutor<Document>{}

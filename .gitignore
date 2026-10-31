@@ -345,3 +345,11 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/java,intellij,python,macos
+# IDE & tool local state
+.idea/
+.vscode/
+.zcode/
+.mimosa/
+
+# App data (upload storage, Sprint 2)
+storage/
