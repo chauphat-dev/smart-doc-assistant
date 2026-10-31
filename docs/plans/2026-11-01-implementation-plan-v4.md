@@ -10,6 +10,19 @@
 
 **Tech Stack:** Java 25 · Spring Boot 4.1.1 · PostgreSQL 18 · Qdrant v1.19.1 · Python FastAPI · `google-genai` · Gemini (chat + `gemini-embedding-001` — **kiểm tra lại tên model hiện hành lúc bắt đầu S2**).
 
+> 🗺️ **Cách đọc sơ đồ trong plan:** sơ đồ chỉ mô tả **luồng** và **ranh giới**. Chỗ có ❓ là **quyết định của em** — sơ đồ cố tình không trả lời hộ.
+
+```mermaid
+flowchart LR
+    U["Browser / curl"] -->|"REST + SSE :8080"| J["Java Spring Boot<br/>metadata · orchestrate"]
+    J -->|"JPA"| PG[("PostgreSQL 18<br/>document · conversation · chat_message")]
+    J -->|"save / delete"| D[("Disk<br/>file gốc, tên = UUID")]
+    J -->|"HTTP :8000<br/>ingest · chat · xóa vectors"| P["Python FastAPI<br/>parse · chunk · embed · RAG"]
+    D -.->|"❓ path chung hay Java gửi bytes — quyết ở S2"| P
+    P -->|"upsert / search"| Q[("Qdrant<br/>vectors + payload")]
+    P -->|"embed / generate"| G["Gemini API"]
+```
+
 ---
 
 ## 0. Vì sao có v4 — thay đổi so với v3
@@ -39,6 +52,28 @@ v3 là plan "chung chung". v4 sửa theo **những gì Sprint 1 thực sự cho 
 5. **Learning log:** mọi câu 🧠 trả lời ngắn (3–5 dòng, bằng lời của em) vào `docs/learning-log.md`, theo sprint. Mentor chấm từ file này.
 6. **Git flow kiểu công ty:** 1 sprint = 1 branch `feature/<tên>` = 1 PR vào `main`. Commit nhỏ, conventional commits. PR description: *What / Why / How tested*. Trước khi xin review: tự đọc diff 1 lượt.
 7. **🚪 Ownership Gate (cuối mỗi sprint):** nhắn mentor `ownership check S<n>` → 5–7 câu hỏi về chính code của em, trả lời **không mở code**. Đạt ≥ 5/7 → merge PR, sang sprint mới. Chưa đạt → 1 buổi vá lỗ hổng rồi hỏi lại. Lỗ hổng được ghi vào learning log.
+
+### Vòng đời 1 sprint (luật 1–7 trên 1 hình)
+
+```mermaid
+flowchart TD
+    A["Tạo branch feature/*"] --> B["Viết test ĐỎ"]
+    B --> C["Code cho XANH"]
+    C --> D["Refactor"]
+    C -.->|"bí > 45 phút"| H["Hint 1 → Hint 2 → Hint 3<br/>không có Hint 4 = code"]
+    H -.-> C
+    D --> E{"Đủ ✅ DoD?<br/>test + lệnh đã chạy"}
+    E -->|"Chưa — Compile ≠ Done"| B
+    E -->|"Rồi"| F["Trả lời 🧠 vào learning-log.md<br/>commit nhỏ"]
+    F --> G{"Còn task?"}
+    G -->|"Còn"| B
+    G -->|"Hết"| I["Tự đọc diff → mở PR<br/>What / Why / How tested"]
+    I --> J["🚪 ownership check S‹n›"]
+    J --> K{"≥ 5/7?"}
+    K -->|"Đạt"| L["Merge vào main → sprint mới"]
+    K -->|"Chưa"| M["Buổi vá lỗ hổng<br/>ghi vào learning log"]
+    M --> J
+```
 
 ---
 
@@ -186,6 +221,24 @@ gantt
 6. Query: embed câu hỏi → top-k → prompt grounded ("chỉ trả lời từ context, thiếu thì nói không biết") → in câu trả lời + list `(doc, page)`.
 7. Thí nghiệm, ghi `NOTES.md`: k=3 vs 8 · chunk nhỏ vs lớn · có/không overlap · ngưỡng score "không liên quan".
 
+```mermaid
+flowchart LR
+    subgraph ING["Ingest — bước 2 → 5"]
+        A["PDF"] --> B["Trích từng trang<br/>(page, text)"]
+        B --> C["Chunk + overlap<br/>page · doc_name · chunk_index"]
+        C --> E1["Embed batch<br/>task type: document"]
+        E1 --> Q[("Qdrant<br/>cosine")]
+    end
+    subgraph QRY["Query — bước 6"]
+        Qs["Câu hỏi"] --> E2["Embed<br/>task type: query"]
+        E2 --> S["Search top-k"]
+        S --> PR["Prompt grounded<br/>context + câu hỏi"]
+        PR --> L["Gemini"]
+        L --> R["Câu trả lời + list (doc, page)"]
+    end
+    Q --> S
+```
+
 **Đầu ra quan trọng nhất — 3 quyết định contract (ghi trong `NOTES.md`):**
 - Python trả gì cho Java sau ingest? Chỉ `chunkCount`, hay metadata từng chunk?
 - **Bảng `document_chunk` trong Postgres có còn cần không** khi Qdrant payload đã giữ page + text? Đâu là source of truth? (Giữ, bỏ, hay thu gọn — em quyết, có lý do.)
@@ -202,6 +255,52 @@ gantt
 ---
 
 ## Sprint 3 — Upload + pipeline async (Java, AI còn là stub) · 2026-11-18 → 11-27 · UC-01, UC-02
+
+**Vòng đời status của document** (S1-3 · S3-3 · S7-2):
+
+```mermaid
+stateDiagram-v2
+    [*] --> PROCESSING: POST upload → 202
+    PROCESSING --> READY: ingest OK + chunkCount
+    PROCESSING --> ERROR: ingest lỗi / timeout (R2)
+    PROCESSING --> ERROR: watchdog — kẹt quá X phút (S7-2)
+    READY --> [*]: DELETE → 204
+    ERROR --> [*]: DELETE → 204
+    PROCESSING --> [*]: ❓ DELETE → 204 hay 409 — quyết ở S1-3
+```
+
+**Luồng upload → READY** (S3-2 + S3-3) — đây cũng là khung để trả lời câu phỏng vấn số 1 ở mục 5:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Client
+    participant Ctl as DocumentController
+    participant Svc as DocumentService
+    participant FS as FileStorage
+    participant DB as PostgreSQL
+    participant Ex as Async executor
+    participant AI as AiServiceClient
+
+    C->>Ctl: POST /api/v1/documents (multipart)
+    Ctl->>Svc: upload(file, title)
+    Svc->>Svc: validate — rỗng · ≤ 20MB · MIME · magic bytes
+    Svc->>FS: lưu file, tên = UUID
+    Svc->>DB: INSERT status = PROCESSING
+    Note over Svc,DB: ❓ Thứ tự lưu file ↔ INSERT: bên nào fail thì ai dọn?
+    Note over Svc,DB: COMMIT
+    Svc-)Ex: bắt đầu ingest — chỉ SAU commit
+    Svc-->>Ctl: Response DTO
+    Ctl-->>C: 202 Accepted + Location
+    Ex->>AI: ingest(documentId, ...)
+    alt thành công
+        AI-->>Ex: chunkCount
+        Ex->>DB: update có bảo vệ → READY
+    else exception / timeout
+        Ex->>DB: update có bảo vệ → ERROR + errorMessage
+    end
+    Note over Ex,DB: ❓ R6 — @Version hay conditional update? Quyết ở S3-3
+```
 
 ### S3-1: Contract Java → AI Service + Storage
 
@@ -306,6 +405,34 @@ gantt
 
 **Tư duy:** `POST /api/v1/conversations/{id}/messages` → `text/event-stream`; nhận stream từ Python và forward. USER message lưu ngay; ASSISTANT lưu khi stream xong (gộp token + sources). Client disconnect giữa chừng → lưu hay không (R5)? Hủy call Python thế nào? Timeout stream config riêng, khác ingest.
 
+```mermaid
+sequenceDiagram
+    actor C as Client
+    participant J as Java backend
+    participant DB as PostgreSQL
+    participant P as Python ai-service
+    participant Q as Qdrant
+    participant G as Gemini
+
+    C->>J: POST /api/v1/conversations/{id}/messages
+    J->>DB: lưu USER message
+    J->>DB: lấy N tin gần nhất
+    J->>P: POST /chat — query, documentIds, history
+    P->>Q: search top-k, filter theo documentIds
+    P->>G: prompt grounded (streaming)
+    loop từng token
+        G-->>P: token
+        P-->>J: event token
+        J-->>C: event token
+    end
+    P-->>J: event sources
+    J-->>C: event sources
+    J->>DB: lưu ASSISTANT — text gộp + sources JSON
+    opt Client ngắt giữa chừng (R5)
+        Note over C,P: ❓ Hủy call Python thế nào? Có lưu nửa câu trả lời không?
+    end
+```
+
 **🔑** `SseEmitter` vs WebClient `Flux<ServerSentEvent>` (so sánh, viết 3 dòng kết luận) · async request timeout · cancellation
 
 **🧠** Vì sao không cho client gọi thẳng Python :8000? (≥ 2 lý do kiến trúc)
@@ -327,6 +454,15 @@ Em là backend — UI chỉ cần đủ demo. Đề xuất: Vite + vanilla JS/TS
 ### S6-2: Docker full-stack
 
 Dockerfile multi-stage cho backend + Dockerfile cho ai-service; compose chạy **cả 4 service** bằng 1 lệnh; healthcheck + `depends_on: condition`; chia sẻ file theo quyết định S2.
+
+```mermaid
+flowchart LR
+    BE["backend :8080"] -->|"depends_on: service_healthy"| PG[("postgres :5432")]
+    BE -->|"depends_on: service_healthy"| AI["ai-service :8000"]
+    AI -->|"depends_on: service_healthy"| QD[("qdrant :6333")]
+    BE --- V[("volume file gốc")]
+    V -.-|"chỉ khi S2 chọn path chung"| AI
+```
 
 **🔑** multi-stage build · non-root user · `depends_on.condition: service_healthy` · Spring Boot layered jar
 
