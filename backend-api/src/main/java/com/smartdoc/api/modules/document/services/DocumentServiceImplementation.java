@@ -1,5 +1,6 @@
 package com.smartdoc.api.modules.document.services;
 
+import com.smartdoc.api.common.exceptions.ConflictException;
 import com.smartdoc.api.common.exceptions.NotFoundException;
 import com.smartdoc.api.modules.document.entities.Document;
 import com.smartdoc.api.modules.document.enums.DocumentStatus;
@@ -43,4 +44,14 @@ public class DocumentServiceImplementation implements DocumentService {
         return documentRepository.findAll(spec, pageable).map(documentMapper::toDocumentSummary);
     };
 
+    @Transactional
+    @Override
+    public void deleteById(UUID id) {
+        var document = documentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Document not found with id: " + id));
+        if (document.getStatus() == DocumentStatus.PROCESSING) {
+            throw new ConflictException("Cannot delete document with PROCESSING status");
+        }
+        documentRepository.delete(document);
+    }
 }
