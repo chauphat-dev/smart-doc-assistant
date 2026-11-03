@@ -12,7 +12,11 @@ import org.springframework.data.domain.Pageable;
 import java.util.UUID;
 
 public interface DocumentService {
+
+    //Core CRUD
     DocumentResponse findById(UUID id);
+    void deleteById(UUID id);
 
     Page<DocumentSummary> findAllByStatusAndType(DocumentType documentType, DocumentStatus documentStatus, Pageable pageable);
+
 }

@@ -5,7 +5,6 @@ import com.smartdoc.api.modules.document.enums.DocumentStatus;
 import com.smartdoc.api.modules.document.enums.DocumentType;
 import com.smartdoc.api.modules.document.records.DocumentResponse;
 import com.smartdoc.api.modules.document.records.DocumentSummary;
-import com.smartdoc.api.modules.document.repositories.DocumentRepository;
 import com.smartdoc.api.modules.document.services.DocumentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -13,7 +12,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -37,6 +35,12 @@ public class DocumentController {
             @PageableDefault(sort = "createdAt",direction = Sort.Direction.DESC) Pageable pageable
             ) {
         return ResponseEntity.ok(documentService.findAllByStatusAndType(docType,status, pageable));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteDocumentById(@PathVariable UUID id) {
+        documentService.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
 }

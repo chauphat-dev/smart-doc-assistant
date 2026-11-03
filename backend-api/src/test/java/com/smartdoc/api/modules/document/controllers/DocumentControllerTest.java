@@ -1,18 +1,22 @@
 package com.smartdoc.api.modules.document.controllers;
 
+import com.smartdoc.api.common.exceptions.ConflictException;
 import com.smartdoc.api.common.exceptions.NotFoundException;
 import com.smartdoc.api.common.web.GlobalExceptionHandler;
+import com.smartdoc.api.modules.document.enums.DocumentStatus;
+import com.smartdoc.api.modules.document.enums.DocumentType;
 import com.smartdoc.api.modules.document.records.DocumentResponse;
 import com.smartdoc.api.modules.document.records.DocumentSummary;
 import com.smartdoc.api.modules.document.services.DocumentService;
-// Import các enum tương ứng trong entity/module document của dự án
-import com.smartdoc.api.modules.document.enums.DocumentStatus;
-import com.smartdoc.api.modules.document.enums.DocumentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,27 +25,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 
 @WebMvcTest(DocumentController.class)
@@ -184,4 +173,79 @@ class DocumentControllerTest {
         // Xác minh service được gọi đúng 1 lần
         verify(documentService).findAllByStatusAndType(any(), any(), any(Pageable.class));
     }
+
+    @Test
+    @DisplayName("DELETE /api/v1/documents/{id} - 204 No Content when success")
+    void deleteDocumentById_WhenValidId_ShouldReturn204NoContent() throws Exception {
+        // 1. Arrange
+        UUID validId = UUID.randomUUID();
+
+        // 2. Act & 3. Assert
+        mockMvc.perform(delete(BASE_URL, validId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        verify(documentService).deleteById(validId);
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/documents/{id} - 404 Not Found if document is not found")
+    void deleteDocumentById_WhenNotFound_ShouldReturn404ProblemDetail() throws Exception {
+        // 1. Arrange
+        UUID nonExistentId = UUID.randomUUID();
+        String expectedMessage = "Document not found with id: " + nonExistentId;
+
+        doThrow(new NotFoundException(expectedMessage))
+                .when(documentService).deleteById(nonExistentId);
+
+        // 2. Act & 3. Assert
+        mockMvc.perform(delete(BASE_URL, nonExistentId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.title").value("Resource Not Found"))
+                .andExpect(jsonPath("$.detail").value(expectedMessage));
+
+        verify(documentService).deleteById(nonExistentId);
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/documents/{id} - 409 Conflict when document is PROCESSING")
+    void deleteDocumentById_WhenConflict_ShouldReturn409ProblemDetail() throws Exception {
+        // 1. Arrange
+        UUID processingId = UUID.randomUUID();
+        String expectedMessage = "Document is currently processing and cannot be deleted";
+
+        doThrow(new ConflictException(expectedMessage))
+                .when(documentService).deleteById(processingId);
+
+        // 2. Act & 3. Assert
+        mockMvc.perform(delete(BASE_URL, processingId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.title").value("Resource Conflict"))
+                .andExpect(jsonPath("$.detail").value(expectedMessage));
+
+        verify(documentService).deleteById(processingId);
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/documents/{id} - 400 Bad Request when UUID is in wrong format")
+    void deleteDocumentById_WhenInvalidUUIDFormat_ShouldReturn400ProblemDetail() throws Exception {
+        // 1. Arrange
+        String invalidId = "not-a-valid-uuid";
+
+        // 2. Act & 3. Assert
+        mockMvc.perform(delete(BASE_URL, invalidId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title").value("Method Argument Type Mismatch"));
+
+        verifyNoInteractions(documentService);
+    }
+
+
 }

@@ -1,10 +1,10 @@
 package com.smartdoc.api.common.web;
 
+import com.smartdoc.api.common.exceptions.ConflictException;
 import com.smartdoc.api.common.exceptions.NotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
-import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -36,7 +36,18 @@ public class GlobalExceptionHandler {
         problemDetail.setInstance(URI.create(request.getRequestURI()));
         problemDetail.setProperty("timestamp", Instant.now());
         return problemDetail;
+    }
 
+    @ExceptionHandler(ConflictException.class)
+    public ProblemDetail conflictException(ConflictException e, HttpServletRequest request) {
+        ProblemDetail problemDetail=ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT,
+                e.getMessage()
+        );
+        problemDetail.setTitle("Resource Conflict");
+        problemDetail.setInstance(URI.create(request.getRequestURI()));
+        problemDetail.setProperty("timestamp", Instant.now());
+        return problemDetail;
     }
 
 }
