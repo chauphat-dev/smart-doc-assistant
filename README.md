@@ -17,4 +17,4 @@ cd backend-api && ./mvnw spring-boot:run
 
 Swagger UI: http://localhost:8080/swagger-ui.html
 
-Chi tiết kiến trúc & lộ trình: [docs/plans/2026-10-24-implementation-plan-v3.md](docs/plans/2026-10-24-implementation-plan-v3.md) · Yêu cầu sản phẩm: [docs/product-requirements.md](docs/product-requirements.md)
+
